@@ -91,7 +91,7 @@ def _load_inf(data_choose):
     df = pd.read_excel(io=xlsx_path, sheet_name=sheet_name)  # 打开excel文件
 
     patient_ids = df.iloc[:, 0].values  # 读取编号列
-    patient_labels = df[u'结局'].values  # 读取结局列
+    patient_labels = df[u'新辅助后病理疗效评价'].values  # 读取结局列
     patient_T2_resolution = df[u'T2序列分辨率'].values  # 读取T2序列分辨率
 
     patient_T2_resolution = patient_T2_resolution[~np.isnan(patient_labels)]  # 删掉 nan
@@ -259,6 +259,28 @@ def init_dataset(data_chooses=[0], test_size=0.2, std_spacing_method="global_std
             min(json_dataset["test_hw_min_max"][2], json_dataset["train_hw_min_max"][2]),
             max(json_dataset["test_hw_min_max"][3], json_dataset["train_hw_min_max"][3])
         ]
+
+
+        # 新增将图像按病人划分
+        json_dataset["trainBypatient"] = {}
+        json_dataset["testBypatient"] = {}
+        for dataset_type in ["train", "test"]:
+            hw_min_max = []
+            for patient_id, patient_label in dataset[dataset_type].items():
+                #json_dataset[dataset_type + "Bypatient"] = []
+                json_dataset[dataset_type + "Bypatient"][patient_id] = []
+                mri_img_paths, tumor_index, tumor_hw_min_max = _get_image_paths(data_choose, patient_id)
+                for i in range(len(mri_img_paths)):  # 对于每个病人的每张slide
+                    json_dataset[dataset_type + "Bypatient"][patient_id].append({
+                        'path': mri_img_paths[i],
+                        'label': patient_label,
+                        'id': str(data_choose) + '_' + patient_id,
+                        'tumor_index': tumor_index[i],
+                        'tumor_hw_min_max': tumor_hw_min_max[i]
+                    })
+                # 列表拼接，如 [[273, 300, 268, 288], [270, 312, 264, 290]] + [265, 312, 261, 290] = [[273, 300, 268, 288], [270, 312, 264, 290], [265, 312, 261, 290]]
+                hw_min_max += tumor_hw_min_max
+
     ############################################################################################################
 
     ## 训练集和测试集分别统计均值方差，并记录一些信息 ##############################################################
@@ -464,7 +486,7 @@ class MriDataset(Data.Dataset):
         #print("HHHHHHHHH:")
         #print(img.shape)
 
-        # print(self.dataset[index]["resize_coef"])
+        # print
         img = np.expand_dims(img, axis=1)
         img = torch.from_numpy(img)
         return img, label, id

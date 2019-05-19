@@ -134,6 +134,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        height = x.shape[1]
         x = self.conv1_(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -144,7 +145,9 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
+        #x = self.avgpool(x)
+        #change
+        x = nn.AvgPool3d(kernel_size=(height,7,7), stride=1)
         x = x.view(x.size(0), -1)
         x = self.fc_(x)
 
