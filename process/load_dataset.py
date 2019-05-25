@@ -428,6 +428,8 @@ class MriDataset(Data.Dataset):
             self.normalize = transforms.Compose([transforms.Normalize(mean=[mean_std[0]], std=[mean_std[1]])])
 
             self.dataset = self.dataset_info[self.data_type]
+            #add
+            self.datasetBypatient = self.dataset_info[self.data_type + "Bypatient"]
 
             # self.hw_min_max = self.dataset_info["global_hw_min_max_spc"]
 
@@ -435,64 +437,85 @@ class MriDataset(Data.Dataset):
         self.is_spacing = is_spacing
 
     def __getitem__(self, index):
-        img = read_image(self.dataset[index]['path'])  # img, 数据格式(h, w, c), 类型numpy int16
-        img = Image.fromarray(img, mode="I;16")  # img, 数据格式(h, w, c), 类型PIL.Image.Image image mode=I;16
 
-        # -1. spacing resize
-        if self.is_spacing is True:
-            shape = self.dataset[index]["shape"]
-            shape_spc = self.dataset[index]["shape_spc"]
-            if shape[0] != shape_spc[0]:
-                img = img.resize(size=(shape_spc[0], shape_spc[1]), resample=Image.NEAREST)  # spacing resize
-            if shape_spc[0] != self.max_size_spc:
-                img = transforms.Compose([transforms.CenterCrop(size=self.max_size_spc)])(
-                    img)  # centercrop to the max_img size
+        # add
+        imgs = np.empty(shape=[0, 224, 224])
+        counter = 0
+        label = 0
+        id = 0
+        for patientid, _ in self.datasetBypatient.items(): #{sub001: [], sub002:[]}
+            if counter != index:
+                counter += 1
+                continue
+            else:
+                datas = self.datasetBypatient[patientid]
+                for j in range(len(datas)):
+                    img = read_image(datas[j]['path'])  # img, 数据格式(h, w, c), 类型numpy int16
+                    img = Image.fromarray(img, mode="I;16")  # img, 数据格式(h, w, c), 类型PIL.Image.Image image mode=I;16
 
-            center_w = (self.global_hw_min_max_spc_world[3] + self.global_hw_min_max_spc_world[2]) / 2
-            llength = self.global_hw_min_max_spc_world[1] - self.global_hw_min_max_spc_world[0] + 1
-            left = int(round(center_w - llength / 2))
-            img = img.crop((
-                left,  # left
-                self.global_hw_min_max_spc_world[0],  # upper
-                left + llength,  # right
-                self.global_hw_min_max_spc_world[1] + 1  # lower
-            ))
-            # img = img.crop((
-            #     self.global_hw_min_max_spc_world[2],    # left
-            #     self.global_hw_min_max_spc_world[0],    # upper
-            #     self.global_hw_min_max_spc_world[3]+1,    # right
-            #     self.global_hw_min_max_spc_world[1]+1     # lower
-            # ))
+                    # -1. spacing resize
+                    if self.is_spacing is True:
+                        shape = self.dataset[index]["shape"]
+                        shape_spc = self.dataset[index]["shape_spc"]
+                        if shape[0] != shape_spc[0]:
+                            img = img.resize(size=(shape_spc[0], shape_spc[1]),
+                                             resample=Image.NEAREST)  # spacing resize
+                        if shape_spc[0] != self.max_size_spc:
+                            img = transforms.Compose([transforms.CenterCrop(size=self.max_size_spc)])(
+                                img)  # centercrop to the max_img size
 
-        img = img.resize(size=(224, 224), resample=Image.NEAREST)
+                        center_w = (self.global_hw_min_max_spc_world[3] + self.global_hw_min_max_spc_world[2]) / 2
+                        llength = self.global_hw_min_max_spc_world[1] - self.global_hw_min_max_spc_world[0] + 1
+                        left = int(round(center_w - llength / 2))
+                        img = img.crop((
+                            left,  # left
+                            self.global_hw_min_max_spc_world[0],  # upper
+                            left + llength,  # right
+                            self.global_hw_min_max_spc_world[1] + 1  # lower
+                        ))
+                        # img = img.crop((
+                        #     self.global_hw_min_max_spc_world[2],    # left
+                        #     self.global_hw_min_max_spc_world[0],    # upper
+                        #     self.global_hw_min_max_spc_world[3]+1,    # right
+                        #     self.global_hw_min_max_spc_world[1]+1     # lower
+                        # ))
+                    img = img.resize(size=(224, 224), resample=Image.NEAREST)
 
-        # 0. 在这里做数据增广
-        if self.transform != None:
-            img = self.transform(img)
+                    # 0. 在这里做数据增广
+                    if self.transform != None:
+                        img = self.transform(img)
+                    # 1. 转成tensor; img, 数据格式(c, h, w), 类型tensor torch.int16; 注意这里的ToTensor不会将像素值scale到0~1
+                    img = transforms.Compose([transforms.ToTensor()])(img)
 
-        # 1. 转成tensor; img, 数据格式(c, h, w), 类型tensor torch.int16; 注意这里的ToTensor不会将像素值scale到0~1
-        img = transforms.Compose([transforms.ToTensor()])(img)
+                    # 2. 类型转换; img, 数据格式(c, h, w), 类型tensor torch.float32
+                    img = img.float()
 
-        # 2. 类型转换; img, 数据格式(c, h, w), 类型tensor torch.float32
-        img = img.float()
+                    # 3. 归一化
+                    if self.normalize != None:
+                        img = self.normalize(img)
 
-        # 3. 归一化
-        if self.normalize != None:
-            img = self.normalize(img)
+                    label = self.dataset[index]['label']
+                    id = self.dataset[index]['id']
+                    ## add
+                    #imgs = imgs.numpy()
+                   # imgs.append(imgs, img)
+                    #img = img.unsqueeze(0)
+                    #imgs = torch.cat([imgs,img], 0)
+                    img = img.numpy()
+                    #img = img[np.newaxis]
+                    #imgs = imgs.numpy()
+                    imgs = np.append(imgs, img, axis =0)
+                    #imgs = torch.from_numpy(imgs)
 
-        label = self.dataset[index]['label']
-        id = self.dataset[index]['id']
 
-        #print("HHHHHHHHH:")
-        #print(img.shape)
-
-        # print
-        img = np.expand_dims(img, axis=1)
-        img = torch.from_numpy(img)
-        return img, label, id
+                break
+        #change
+        imgs = imgs[np.newaxis]
+        imgs = torch.from_numpy(imgs)
+        return imgs, label, id
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.datasetBypatient)
 
     def get_class_weight(self):
         class_num = [0, 0, 0]  # 统计每类样本的数量

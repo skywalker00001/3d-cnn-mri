@@ -75,7 +75,7 @@ log.logger.info('std_spacing_method: {}'.format(std_spacing_method))
 
 # init datasets
 mean_std, max_size_spc, global_hw_min_max_spc_world = process.load_dataset.init_dataset(
-    data_chooses=data_chooses, test_size=0.2, std_spacing_method=std_spacing_method, new_init=True
+    data_chooses=data_chooses, test_size=0.2, std_spacing_method=std_spacing_method, new_init=False
 )
 log.logger.info('mean_std: {}'.format(mean_std))
 log.logger.info('max_size_spc: {}'.format(max_size_spc))
@@ -110,12 +110,13 @@ train_eval_data = process.load_dataset.MriDataset(train=True, transform=train_ev
 test_data = process.load_dataset.MriDataset(train=False, transform=test_transform, is_spacing=is_spacing)
 
 
+
 def checkImage(num=5):
     """
     在本地机器上运行，打开图片查看，检查，函数结束时会退出程序 (exit)
     """
     for _ in range(num):
-        img_index = random.randint(1, 100)
+        img_index = random.randint(1, 10)
         print(train_data[img_index][0].shape)
         print(train_data[img_index][0].dtype)
         print(train_data[img_index][0])
@@ -144,10 +145,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_data, batch_size=batch_si
 
 # Declare and define the model, optimizer and loss_func
 # model = models.resnets.resnet18(pretrained=True, num_classes=num_classes, img_in_channels=1)
-
-# model = resnet34(pretrained=False, num_classes=num_classes)
-=======
-model = resnet34(pretrained=True, num_classes=num_classes)
+model = resnet34(pretrained=False, num_classes=num_classes)
 # model = resnet152(pretrained=True, num_classes=num_classes)
 # model = densenet121(pretrained=True, num_classes=num_classes)
 
